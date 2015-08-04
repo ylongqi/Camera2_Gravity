@@ -52,11 +52,13 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,6 +70,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Camera2BasicFragment extends Fragment implements View.OnClickListener {
 
+    private TextView mDisplay;
     /**
      * Conversion from screen rotation to JPEG orientation.
      */
@@ -212,7 +215,10 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
     /**
      * This is the output file for our picture.
      */
+    private int count = 0;
     private File mFile;
+    private File mFile_Sensor;
+    private boolean mSave_flag = false;
 
     /**
      * This a callback object for the {@link ImageReader}. "onImageAvailable" will be called when a
@@ -223,10 +229,48 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
 
         @Override
         public void onImageAvailable(ImageReader reader) {
+            mFile = new File(getActivity().getExternalFilesDir(null), "pic_" + count + ".jpg");
+            mFile_Sensor = new File(getActivity().getExternalFilesDir(null), "sen_" + count + ".txt");
+            mSave_flag = true;
             mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));
+            count ++;
+            showToast("Saved: " + mFile);
         }
 
     };
+
+    private static class SensorSaver implements Runnable {
+
+        /**
+         * The JPEG image
+         */
+        private final float[] mSensor;
+        /**
+         * The file we save the image into.
+         */
+        private final File mFile_Sensor;
+
+        public SensorSaver(float[] sensor, File file) {
+            mSensor = sensor;
+            mFile_Sensor = file;
+        }
+
+        @Override
+        public void run() {
+            PrintStream output = null;
+            try {
+                output = new PrintStream(new FileOutputStream(mFile_Sensor));
+                output.print(mSensor[0] + "," + mSensor[1] + "," + mSensor[2]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (null != output) {
+                    output.close();
+                }
+            }
+        }
+
+    }
 
     /**
      * {@link CaptureRequest.Builder} for the camera preview
@@ -329,6 +373,13 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
         }
     };
 
+    public void updateSensorInfo(float[] values){
+        mDisplay.setText("x = " + values[0] + "\n" + "y = " + values[1] + "\n" + "z = " + values[2]);
+        if(mSave_flag){
+            mBackgroundHandler.post(new SensorSaver(values, mFile_Sensor));
+            mSave_flag = false;
+        }
+    }
     /**
      * Shows a {@link Toast} on the UI thread.
      *
@@ -389,14 +440,14 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
-        view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
+        mDisplay = (TextView) view.findViewById(R.id.display);
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
+
     }
 
     @Override
@@ -716,7 +767,6 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
                 @Override
                 public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request,
                                                TotalCaptureResult result) {
-                    showToast("Saved: " + mFile);
                     unlockFocus();
                 }
             };
@@ -751,6 +801,8 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
 
     @Override
     public void onClick(View view) {
+        takePicture();
+        /*
         switch (view.getId()) {
             case R.id.picture: {
                 takePicture();
@@ -767,6 +819,7 @@ public class Camera2BasicFragment extends Fragment implements View.OnClickListen
                 break;
             }
         }
+        */
     }
 
     /**

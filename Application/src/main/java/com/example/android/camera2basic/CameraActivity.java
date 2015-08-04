@@ -17,19 +17,60 @@
 package com.example.android.camera2basic;
 
 import android.app.Activity;
+import android.app.Fragment;
+import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.widget.TextView;
 
 public class CameraActivity extends Activity {
+
+    private SensorManager mSensorManager;
+    private Sensor mGravity;
+    private SensorEventListener mSensorEventListener;
+    private TextView mDisplay;
+    private Camera2BasicFragment mCameraFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
+        mCameraFragment = Camera2BasicFragment.newInstance();
         if (null == savedInstanceState) {
             getFragmentManager().beginTransaction()
-                    .replace(R.id.container, Camera2BasicFragment.newInstance())
+                    .replace(R.id.container, mCameraFragment)
                     .commit();
         }
+
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        mGravity = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+        //mDisplay = (TextView)findViewById(R.id.display);
+        mSensorEventListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                mCameraFragment.updateSensorInfo(event.values);
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+                //Doing Nothing
+            }
+        };
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mSensorManager.registerListener(mSensorEventListener, mGravity, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mSensorManager.unregisterListener(mSensorEventListener);
     }
 
 }
